@@ -3,12 +3,11 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QDebug>
-#include "../zgTracker/landingpoint.h"
-#include "../zgTracker/trackpoint.h"
+#include <QSettings>
 
 
 
-
+//===========================================
 AdsbSorter::AdsbSorter(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::AdsbSorter)
@@ -20,6 +19,7 @@ AdsbSorter::AdsbSorter(QWidget *parent) :
 
 
 
+//===========================================
 AdsbSorter::~AdsbSorter()
 {
     delete ui;
@@ -103,8 +103,24 @@ void AdsbSorter::on_pbStart_released()
     inFile.close();
 
     sortData(&trackList);
-    writeOutFile(&outFile);
+    writeOutFile(&outFile, &trackList);
     outFile.close();
+
+    ui->lbProcessName->setText("Очистка");
+    float trackListCount {float(100.0 / trackList.count())};
+    int trackListPosition {0};
+
+    for (AdsbTrack *adsbTrack : trackList)
+    {
+        trackListPosition++;
+        ui->progressBar->setValue(int(trackListPosition * trackListCount));
+        for (QPair <double, double>* points : adsbTrack->points) {
+            delete points;
+        }
+        adsbTrack->points.clear();
+        delete adsbTrack;
+    }
+    trackList.clear();
 }
 
 
@@ -131,6 +147,7 @@ void AdsbSorter::sortData(QMap<qint32, AdsbTrack *> *trackList)
         {
             trackListPosition++;
             ui->progressBar->setValue(int(trackListPosition * trackListCount));
+
             bool latContains {false};
             bool lonContains {false};
             for (QPair <double, double> *coords : adsbTrack->points)
@@ -160,19 +177,35 @@ void AdsbSorter::sortData(QMap<qint32, AdsbTrack *> *trackList)
 //===========================================
 void AdsbSorter::writeOutFile(QFile *outFile, QMap <qint32, AdsbTrack*> *trackList)
 {
+
+    ui->lbProcessName->setText("Сохранение");
+
+    // Пишем количество треков
     qint32 trackCount {trackList->count()};
     outFile->write((char*)&trackCount, sizeof(trackCount));
 
-    for (AdsbTrack *adsbTrack : trackList)
+    float trackListCount {float(100.0 / trackList->count())};
+    int trackListPosition {0};
+
+    // Пишем сами треки
+    for (AdsbTrack *adsbTrack : *trackList)
     {
+        trackListPosition++;
+        ui->progressBar->setValue(int(trackListPosition * trackListCount));
+
+        // Пишем идентификатор трека
         outFile->write((char*)&(adsbTrack->icaoName), sizeof(adsbTrack->icaoName));
         qint32 pointsCount = adsbTrack->points.count();
+        // Пишем количество точек в треке
         outFile->write((char*)&(pointsCount), sizeof(pointsCount));
+        // Пишем точки из трека
         QMapIterator <quint32, QPair <double, double>* > trackPoint (adsbTrack->points);
         while (trackPoint.hasNext())
         {
             trackPoint.next();
-
+            outFile->write((char*)&trackPoint.key(), sizeof(trackPoint.key()));
+            outFile->write((char*)&trackPoint.value()->first, sizeof(trackPoint.value()->first));
+            outFile->write((char*)&trackPoint.value()->second, sizeof(trackPoint.value()->second));
         }
     }
 }
