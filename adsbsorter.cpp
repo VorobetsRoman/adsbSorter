@@ -13,7 +13,46 @@ AdsbSorter::AdsbSorter(QWidget *parent) :
     ui(new Ui::AdsbSorter)
 {
     ui->setupUi(this);
-    ui->dteTimeMax->setDateTime(QDateTime::currentDateTime());
+    loadSettings();
+}
+
+
+
+
+//===========================================
+void AdsbSorter::loadSettings()
+{
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "VRoman", "adsbSorter");
+
+    if (!settings.contains("minTime")){
+        settings.setValue("minTime", "2016.06.01::00:00:00");
+    }
+    ui->dteTimeMin->setDateTime(QDateTime::fromString(settings.value("minTime").toString(), "YYYY.MM.dd::hh:mm:ss"));
+
+    if (!settings.contains("maxTime")){
+        settings.setValue("maxTime", QDateTime::currentDateTime().toString("YYYY.MM.dd::hh:mm:ss"));
+    }
+        ui->dteTimeMax->setDateTime(QDateTime::fromString(settings.value("minTime").toString(), "YYYY.MM.dd::hh:mm:ss"));
+
+    if (!settings.contains("minLat")){
+        settings.setValue("minLat", 0);
+    }
+        ui->leLatMin->setText(QString::number(settings.value("minLat").toFloat()));
+
+    if (!settings.contains("maxLat")){
+        settings.setValue("maxLat", 180);
+    }
+        ui->leLatMax->setText(QString::number(settings.value("maxLat").toFloat()));
+
+    if (!settings.contains("minLon")){
+        settings.setValue("minLon", 0);
+    }
+        ui->leLonMin->setText(QString::number(settings.value("minLon").toFloat()));
+
+    if (!settings.contains("maxLon")){
+        settings.setValue("maxLon", 180);
+    }
+        ui->leLonMax->setText(QString::number(settings.value("maxLon").toFloat()));
 }
 
 

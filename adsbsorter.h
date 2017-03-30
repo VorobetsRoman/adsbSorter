@@ -42,6 +42,7 @@ private:
 
     void sortData       (QMap <qint32, AdsbTrack*> *trackList);
     void writeOutFile   (QFile *outFile, QMap <qint32, AdsbTrack*> *trackList);
+    void loadSettings   ();
 };
 
 #endif // ADSBSORTER_H
