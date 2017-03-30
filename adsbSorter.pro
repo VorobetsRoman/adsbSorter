@@ -30,3 +30,6 @@ HEADERS  += adsbsorter.h \
     trackpoint.h
 
 FORMS    += adsbsorter.ui
+
+RESOURCES += \
+    buttons.qrc

@@ -4,6 +4,8 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QDebug>
+#include "../zgTracker/landingpoint.h"
+#include "../zgTracker/trackpoint.h"
 
 
 
@@ -49,65 +51,47 @@ void AdsbSorter::on_pushButton_released()
 
     //* работа
     // чтение старых данных
-    float fileSize {float (100.0 / inFile.size())};
+    float   fileSize {float (100.0 / inFile.size())};
 
-    QByteArray ba = inFile.readAll();
-    inFile.close();
-    QTextStream ts(&ba);
+    quint32 time    {0};
+    char    temp    {0};
+    qint32  icao    {0};
+    double  lat     {0};
+    double  lon     {0};
 
-    quint32 time {0};
-    char temp {0};
-    qint32 icao {0};
-    double lat {0}, lon{0};
+    qint32  count   {0};
 
     QMap <qint32, AdsbTrack*> trackList; //icao, tracks
-    QVector <quint32> timeList;
+//    QList <QPair <qint32, AdsbTrack*> > trackList; //icao, tracks
 
-    while (!ts.atEnd())
-    {
-        qDebug() << ts.pos() * fileSize;
-
-        ts >> time;
-        timeList.append(time);
-
-        while (!ts.atEnd())
+    while (!inFile.atEnd()) {
+        qDebug() << inFile.pos() * fileSize;
+        inFile.read((char*)&time, sizeof(time));
+        inFile.read((char*)&count, sizeof(count));
+        for (; --count >= 0;)
         {
-            ts >> temp;
-            if (temp == char(10)) break; // конец строки
-
-            ts >> icao;
-
-            AdsbTrack* adsbTrack {NULL};
-            if (trackList.keys().indexOf(icao) <= 0)
-            {
-                adsbTrack = new AdsbTrack(icao);
-                trackList.insert(icao, adsbTrack);
-            }
-            else
-            {
-                adsbTrack = trackList[icao];
-            }
-
-            ts >> temp;
-            ts >> lat;
-            ts >> temp;
-            ts >> lon;
-            QPair <double, double> *coords = new QPair <double, double> {lat, lon};
-            adsbTrack->points.insert(&time, coords);
+            inFile.read((char*)&icao, sizeof(icao));
+            inFile.read((char*)&lat, sizeof(lat));
+            inFile.read((char*)&lon, sizeof(lon));
         }
     }
-    ba.clear();
+    inFile.close();
 
+/*
+            QPair <double, double> *coords = new QPair <double, double> {lat, lon};
+            adsbTrack->points.insert(&time, coords);
+            ts >> temp;
+
+  /*  qDebug() << trackList.count();
     // запись новых данных
     QMapIterator<qint32, AdsbTrack*> track(trackList);
-    qDebug() << trackList.count();
-//    QDataStream ds(&outFile);
     while (track.hasNext()) {
         track.next();
-        // записать название трека
+        // записать название трека и количество точек в нем
         outFile.write((char*)&(track.key()), sizeof(track.key()));
-        // записать количество точек в треке
-        outFile.write((char*)&(track.value()->points.count()), sizeof(track.value()->points.count()));
+        qint32 pointsCout {track.value()->points.count()};
+        outFile.write((char*)&pointsCout, sizeof(pointsCout));
+
         qDebug() << track.value()->points.count();
         QMapIterator<quint32*, QPair <double, double>* > point(track.value()->points);
         while (point.hasNext()) {
@@ -118,10 +102,16 @@ void AdsbSorter::on_pushButton_released()
             outFile.write((char*)&(point.value()->second), sizeof(point.value()->second));
         }
     }
-
+*/
     outFile.close();
 }
 
 
 
 
+
+void AdsbSorter::on_pushButton_2_released()
+{
+    QString fileName = QFileDialog::getOpenFileName(0, "adsb file", QDir::current().absolutePath(), "*.adsb", 0);
+    if (fileName == "") return;
+}
