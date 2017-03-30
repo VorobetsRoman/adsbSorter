@@ -32,6 +32,7 @@ AdsbSorter::~AdsbSorter()
 void AdsbSorter::on_pbOpen_released()
 {
     inFileName = QFileDialog::getOpenFileName(0, "adsb file", QDir::current().absolutePath(), "*.adsb", 0);
+    ui->lbFileName->setText(inFileName.section("/", -1, -1));
 }
 
 
@@ -49,6 +50,7 @@ void AdsbSorter::on_pbStart_released()
         qDebug () << "error opening file " << inFileName;
         return;
     }
+
 
     QFile outFile(inFileName + "sorted");
     if (!outFile.open(QIODevice::WriteOnly))
@@ -113,7 +115,7 @@ void AdsbSorter::on_pbStart_released()
     for (AdsbTrack *adsbTrack : trackList)
     {
         trackListPosition++;
-        ui->progressBar->setValue(int(trackListPosition * trackListCount));
+        ui->progressBar->setValue(int(trackListPosition * trackListCount) + 1);
         for (QPair <double, double>* points : adsbTrack->points) {
             delete points;
         }
