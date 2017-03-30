@@ -5,6 +5,7 @@
 //#include "trackpoint.h"
 #include <QSet>
 #include <QMap>
+#include <QFile>
 
 
 
@@ -14,7 +15,7 @@ public:
     AdsbTrack() {}
     AdsbTrack(qint32 icao) : icaoName(icao) {}
     qint32 icaoName;
-    QMap <quint32*, QPair <double, double>* > points; //time, points
+    QMap <quint32, QPair <double, double>* > points; //time, points
 };
 
 
@@ -32,14 +33,15 @@ public:
     ~AdsbSorter();
 
 private slots:
-    void on_pushButton_released();
-
-    void on_pushButton_2_released();
+    void on_pbOpen_released();
+    void on_pbStart_released();
 
 private:
-    Ui::AdsbSorter *ui;
+    Ui::AdsbSorter  *ui {NULL};
+    QString         inFileName {""};
 
-
+    void sortData       (QMap <qint32, AdsbTrack*> *trackList);
+    void writeOutFile   (QFile *outFile, QMap <qint32, AdsbTrack*> *trackList);
 };
 
 #endif // ADSBSORTER_H

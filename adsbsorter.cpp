@@ -1,6 +1,5 @@
 #include "adsbsorter.h"
 #include "ui_adsbsorter.h"
-#include <QFile>
 #include <QFileDialog>
 #include <QDir>
 #include <QDebug>
@@ -15,6 +14,7 @@ AdsbSorter::AdsbSorter(QWidget *parent) :
     ui(new Ui::AdsbSorter)
 {
     ui->setupUi(this);
+    ui->dteTimeMax->setDateTime(QDateTime::currentDateTime());
 }
 
 
@@ -28,33 +28,46 @@ AdsbSorter::~AdsbSorter()
 
 
 
-void AdsbSorter::on_pushButton_released()
+//===========================================
+void AdsbSorter::on_pbOpen_released()
 {
-    QString fileName = QFileDialog::getOpenFileName(0, "adsb file", QDir::current().absolutePath(), "*.adsb", 0);
-    if (fileName == "") return;
+    inFileName = QFileDialog::getOpenFileName(0, "adsb file", QDir::current().absolutePath(), "*.adsb", 0);
+}
 
+
+
+
+//===========================================
+void AdsbSorter::on_pbStart_released()
+{
     // проверки
-    QFile inFile(fileName);
+    if (inFileName == "") return;
+
+    QFile inFile(inFileName);
     if (!inFile.open(QIODevice::ReadOnly))
     {
-        qDebug () << "error opening file " << fileName;
+        qDebug () << "error opening file " << inFileName;
         return;
     }
 
-    QFile outFile(fileName + "sorted");
+    QFile outFile(inFileName + "sorted");
     if (!outFile.open(QIODevice::WriteOnly))
     {
-        qDebug() << "error opening file " << fileName + "sorted";
+        qDebug() << "error opening file " << inFileName + "sorted";
         inFile.close();
         return;
     }
+
+    ui->lbProcessName->setText("Проверка времени");
+    // получение ограничений на данные
+    quint32 timeMin = ui->dteTimeMin->dateTime().toTime_t();
+    quint32 timeMax = ui->dteTimeMax->dateTime().toTime_t();
 
     //* работа
     // чтение старых данных
     float   fileSize {float (100.0 / inFile.size())};
 
     quint32 time    {0};
-    char    temp    {0};
     qint32  icao    {0};
     double  lat     {0};
     double  lon     {0};
@@ -62,56 +75,109 @@ void AdsbSorter::on_pushButton_released()
     qint32  count   {0};
 
     QMap <qint32, AdsbTrack*> trackList; //icao, tracks
-//    QList <QPair <qint32, AdsbTrack*> > trackList; //icao, tracks
 
     while (!inFile.atEnd()) {
-        qDebug() << inFile.pos() * fileSize;
+        ui->progressBar->setValue(int (inFile.pos() * fileSize) + 1);
         inFile.read((char*)&time, sizeof(time));
+
         inFile.read((char*)&count, sizeof(count));
         for (; --count >= 0;)
         {
             inFile.read((char*)&icao, sizeof(icao));
             inFile.read((char*)&lat, sizeof(lat));
             inFile.read((char*)&lon, sizeof(lon));
+
+            if (time > timeMin && time < timeMax)
+            {
+                AdsbTrack *adsbTrack = trackList[icao];
+                if (!adsbTrack) {
+                    adsbTrack = new AdsbTrack(icao);
+                    trackList.insert(icao, adsbTrack);
+                }
+                QPair <double, double>* coords = new QPair <double, double> {lat, lon};
+                adsbTrack->points.insert(time, coords);
+            }
         }
     }
+    qDebug() << trackList.count();
     inFile.close();
 
-/*
-            QPair <double, double> *coords = new QPair <double, double> {lat, lon};
-            adsbTrack->points.insert(&time, coords);
-            ts >> temp;
-
-  /*  qDebug() << trackList.count();
-    // запись новых данных
-    QMapIterator<qint32, AdsbTrack*> track(trackList);
-    while (track.hasNext()) {
-        track.next();
-        // записать название трека и количество точек в нем
-        outFile.write((char*)&(track.key()), sizeof(track.key()));
-        qint32 pointsCout {track.value()->points.count()};
-        outFile.write((char*)&pointsCout, sizeof(pointsCout));
-
-        qDebug() << track.value()->points.count();
-        QMapIterator<quint32*, QPair <double, double>* > point(track.value()->points);
-        while (point.hasNext()) {
-            point.next();
-            // записать время, lat, lon
-            outFile.write((char*)&(point.key()), sizeof(point.key()));
-            outFile.write((char*)&(point.value()->first), sizeof(point.value()->first));
-            outFile.write((char*)&(point.value()->second), sizeof(point.value()->second));
-        }
-    }
-*/
+    sortData(&trackList);
+    writeOutFile(&outFile);
     outFile.close();
 }
 
 
 
 
-
-void AdsbSorter::on_pushButton_2_released()
+//===========================================
+void AdsbSorter::sortData(QMap<qint32, AdsbTrack *> *trackList)
 {
-    QString fileName = QFileDialog::getOpenFileName(0, "adsb file", QDir::current().absolutePath(), "*.adsb", 0);
-    if (fileName == "") return;
+    ui->lbProcessName->setText("Проверка координат");
+    bool okMin {false};
+    bool okMax {false};
+    float latMin = ui->leLatMin->text().toFloat(&okMin);
+    float latMax = ui->leLatMax->text().toFloat(&okMax);
+    bool latOk {okMin && okMax && (latMin < latMax)};
+
+    float lonMin = ui->leLonMin->text().toFloat(&okMin);
+    float lonMax = ui->leLonMax->text().toFloat(&okMax);
+    bool lonOk {okMin && okMax && (lonMin < lonMax)};
+
+    float trackListCount {float(100.0 / trackList->count())};
+    int trackListPosition {0};
+    if (latOk || lonOk) {
+        for (AdsbTrack* adsbTrack : *trackList)
+        {
+            trackListPosition++;
+            ui->progressBar->setValue(int(trackListPosition * trackListCount));
+            bool latContains {false};
+            bool lonContains {false};
+            for (QPair <double, double> *coords : adsbTrack->points)
+            {
+                if (latOk && coords->first > latMin && coords->first < latMax) {
+                    latContains = true;
+                }
+                if (lonOk && coords->second > lonMin && coords->second < lonMax) {
+                    lonContains = true;
+                }
+            }
+            if (latOk && !latContains) {
+                    trackList->remove(trackList->key(adsbTrack));
+            }
+            else if (lonOk && !lonContains) {
+                trackList->remove(trackList->key(adsbTrack));
+            }
+        }
+    }
+    qDebug() << trackList->count();
+
 }
+
+
+
+
+//===========================================
+void AdsbSorter::writeOutFile(QFile *outFile, QMap <qint32, AdsbTrack*> *trackList)
+{
+    qint32 trackCount {trackList->count()};
+    outFile->write((char*)&trackCount, sizeof(trackCount));
+
+    for (AdsbTrack *adsbTrack : trackList)
+    {
+        outFile->write((char*)&(adsbTrack->icaoName), sizeof(adsbTrack->icaoName));
+        qint32 pointsCount = adsbTrack->points.count();
+        outFile->write((char*)&(pointsCount), sizeof(pointsCount));
+        QMapIterator <quint32, QPair <double, double>* > trackPoint (adsbTrack->points);
+        while (trackPoint.hasNext())
+        {
+            trackPoint.next();
+
+        }
+    }
+}
+
+
+
+
+//===========================================
