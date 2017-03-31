@@ -162,6 +162,9 @@ void AdsbSorter::on_pbStart_released()
         delete adsbTrack;
     }
     trackList.clear();
+
+    ui->lbProcessName->setText("Готов");
+    ui->progressBar->setValue(0);
 }
 
 

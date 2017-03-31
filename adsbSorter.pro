@@ -26,8 +26,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += main.cpp\
         adsbsorter.cpp
 
-HEADERS  += adsbsorter.h \
-    trackpoint.h
+HEADERS  += adsbsorter.h
 
 FORMS    += adsbsorter.ui
 
